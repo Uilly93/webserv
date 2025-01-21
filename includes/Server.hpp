@@ -25,8 +25,8 @@ class Server {
 
 	// Methods
 	void Server_start();
-	void accept_connections();
-	void epoll_client_add(int client_fd);
+	// void accept_connections();
+	void epoll_client_add();
 
 	int server_socket;
 	sockaddr_in socket_addr;

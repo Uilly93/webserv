@@ -20,7 +20,7 @@
 int main() {
 	Server a(8080);
 	a.Server_start();
-	a.accept_connections();
+	a.epoll_client_add();
 	// struct epoll_event event;
 	// event.events = EPOLLIN;
 	// // std::ifstream file("test.txt");

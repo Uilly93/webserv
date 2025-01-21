@@ -4,9 +4,12 @@
 #include <algorithm>
 #include <asm-generic/socket.h>
 #include <cstddef>
+#include <cstdio>
+#include <cstring>
 #include <iostream>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <unistd.h>
 
 // Constructors
 Server::Server(int port) {
@@ -30,55 +33,81 @@ Server::~Server() {
 }
 
 // Methods
-void Server::epoll_client_add(int client_fd){
+void Server::epoll_client_add() {
 	struct epoll_event event;
 	struct epoll_event events[10];
+	socklen_t len = sizeof(struct sockaddr_in);
+	int client_fd = -1;
 	event.events = EPOLLIN;
-	event.data.fd = client_fd;
+	event.data.fd = server_socket;
 	int epoll_instance = epoll_create(1);
-	epoll_ctl(epoll_instance, EPOLL_CTL_ADD, client_fd, &event);
+	if (epoll_ctl(epoll_instance, EPOLL_CTL_ADD, server_socket, &event) == -1)
+		std::cerr << "EPOLL_CTL ADD error: " << std::endl;
 	while (true) {
 		int nfds = epoll_wait(epoll_instance, events, 10, -1);
 		if (nfds == -1) {
 			std::cerr << "epoll_wait failed: " << std::endl;
 			close(epoll_instance);
-			return ;
+			return;
 		}
 		for (int i = 0; i < nfds; ++i) {
-			if (events[i].events & EPOLLIN) {
-				std::cout << "Event detected on " << client_fd << " client " << std::endl;
-				char buffer[1025];
-				ssize_t count = read(client_fd, buffer, sizeof(buffer));
-				if (count == -1) {
-					std::cerr << "Read error: " << std::endl;
-				} else {
-					buffer[count] = 0;
-					std::cout << "Read " << count << " bytes: " << std::string(buffer)
-							  << std::endl;
-				struct epoll_event out;
-				out.data.fd = client_fd;
-				out.events = EPOLLOUT;
-				epoll_ctl(epoll_instance, EPOLL_CTL_MOD, client_fd, &out);
+			if (event.data.fd == server_socket) {
+				client_fd = accept(server_socket, (struct sockaddr *)&socket_addr, &len);
+				if (client_fd == -1)
+					std::cerr << "Erreur lors de l'acceptation de la connexion" << std::endl;
+				if (events[i].events & EPOLLIN) {
+					std::cout << "Event detected on " << client_fd << " client " << std::endl;
+					char buffer[1025];
+					ssize_t count = read(client_fd, buffer, sizeof(buffer));
+					if (count == -1) {
+						std::cerr << "Read error: " << std::endl;
+					} else {
+						buffer[count] = 0;
+						std::cout << "Read " << count << " bytes: " << std::string(buffer)
+								  << std::endl;
+						// write(client_fd, response.c_str(), response.length());
+						std::string response =
+							"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!";
+						if (send(client_fd, response.c_str(), response.size(), 0) == -1)
+							std::cerr << "Send error: " << std::endl;
+						struct epoll_event out;
+						// if (epoll_ctl(epoll_instance, EPOLL_CTL_MOD, out.data.fd, &out) == -1)
+						// 	perror("");
+						out.events = EPOLLOUT;
+						out.data.fd = client_fd;
+						std::cout << client_fd << RESET << std::endl;
+						// write(out.data.fd, response.c_str(), response.size());
+						// std::string response = "HTTP/1.1 200 OK\r\r\n\r\nHello, World!";
+						// } else {
+						// 	std::cout << "Sent response to client "<< client_fd << ": " << response
+						// << std::endl;
+						// }
+					}
 				}
+				// if (events->events & EPOLLET) {
+				// std::cout << "ssssss" << RESET << std::endl;
+				// ssize_t sent = send(client_fd, response.c_str(), response.length(), 0);
+				// struct epoll_event out;
+				// out.events = EPOLLIN;
+				// out.data.fd = client_fd;
+				// epoll_ctl(epoll_instance, EPOLL_CTL_MOD, client_fd, &out);
+				// }
 			}
 		}
 	}
-	// client_list[event] = client_fd;
+	close(epoll_instance);
 }
 
-void Server::accept_connections() {
-	// struct epoll_event event;
+// void Server::accept_connections() {
+// 	// struct epoll_event event;
 
-	// while (true) {
-	socklen_t len;
-	int client_fd = accept(server_socket, (struct sockaddr *)&socket_addr, &len);
-	if (client_fd == -1)
-		std::cerr << "Erreur lors de l'acceptation de la connexion" << std::endl;
-	epoll_client_add(client_fd);
-}
+// 	// while (true) {
+// 	epoll_client_add(client_fd);
+// 	write(client_fd, "recieved\n", 11);
+// }
 void Server::Server_start() {
 	int b = true;
-	if(setsockopt(server_socket, SOL_SOCKET, SO_REUSEPORT, &b, size_t(b)) == -1)
+	if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEPORT, &b, sizeof(b)) == -1)
 		std::cout << "ERROR sockopt" << RESET << std::endl;
 	if (bind(server_socket, (struct sockaddr *)&socket_addr, sizeof(socket_addr)) < 0) {
 		std::cerr << "Erreur while binding server" << std::endl;

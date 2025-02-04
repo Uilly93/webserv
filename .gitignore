@@ -3,3 +3,4 @@
 *.d
 Webserv
 .clang-format
+*.html

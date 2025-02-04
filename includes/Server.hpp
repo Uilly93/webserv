@@ -27,11 +27,16 @@ class Server {
 	void Server_start();
 	// void accept_connections();
 	void epoll_client_add();
+	bool opened_client();
 
 	int server_socket;
 	sockaddr_in socket_addr;
+	std::vector<int> clients;
+	int epoll_instance;
 	// std::map<struct epoll_event, int> client_list;
 
 };
+
+void sigint_handler(int sig);
 
 #endif
